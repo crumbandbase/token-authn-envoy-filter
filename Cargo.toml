@@ -1,0 +1,10 @@
+[package]
+name = "token-authn-envoy-filter"
+version = "0.1.0"
+authors = ["Tomas Basham <tomasbasham@gmail.com>"]
+edition = "2018"
+
+[lib]
+name = "token_authn"
+
+[dependencies]
