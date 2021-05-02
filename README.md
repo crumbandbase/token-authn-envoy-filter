@@ -1,4 +1,4 @@
-# token-authn-envoy-filter
+# token-authn-envoy-filter ![test](https://github.com/crumbandbase/token-authn-envoy-filter/workflows/test/badge.svg?event=push)
 
 This README outlines the details of collaborating on this Rust application. A
 short introduction of this application could easily go here.
