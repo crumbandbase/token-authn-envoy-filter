@@ -20,3 +20,29 @@ jobs:
     - run: cargo test
       env:
         RUSTFLAGS: "-Clink-arg=-Wl,--allow-multiple-definition"
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      TARGET: wasm32-unknown-unknown
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: ${{ env.TARGET }}
+    - run: cargo install cargo-post
+    - run: cargo post build --release --target ${{ env.TARGET }}
+    - uses: actions/setup-go@v1
+      with:
+        go-version: "1.16"
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    - run: go test -v ./...
+      env:
+        ISTIO_TEST_VERSION: 1.9.3

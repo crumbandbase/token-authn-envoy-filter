@@ -1,0 +1,27 @@
+- name: envoy.filters.http.token_authn
+  typed_config:
+    "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+    type_url: type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
+    value:
+      config:
+        vm_config:
+          runtime: "envoy.wasm.runtime.v8"
+          code:
+            local: { filename: "{{ .Vars.AuthnWasmFile }}" }
+        configuration:
+          "@type": "type.googleapis.com/google.protobuf.StringValue"
+          value: |
+            {
+              {{- if ne .Vars.OmitUpstream "true" }}
+              "upstream": "authn_server",
+              {{- end }}
+              "endpoint": "/authenticate",
+              {{- if ne .Vars.Authority "" }}
+              "authority": "{{ .Vars.Authority }}",
+              {{- end }}
+              {{- if .Vars.Timeout }}
+              "timeout": {{ .Vars.Timeout }}
+              {{- else }}
+              "timeout": 10
+              {{- end }}
+            }

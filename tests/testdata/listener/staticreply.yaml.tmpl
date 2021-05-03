@@ -1,0 +1,55 @@
+name: staticreply
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: {{ .Ports.BackendPort }}
+filter_chains:
+- filters:
+  - name: http
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      stat_prefix: staticreply
+      codec_type: AUTO
+      route_config:
+        name: staticreply
+        virtual_hosts:
+        - name: authentication
+          domains: ["authn.example.com"]
+          routes:
+          - match:
+              path: "/authenticate"
+              headers:
+              - name: "authorization"
+                exact_match: "Bearer correct-credentials"
+            direct_response:
+              status: 200
+              body:
+                inline_string: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEyMzQ1Njc4OTAsImlhdCI6MTUxNjIzOTAyMiwibmFtZSI6IkplYW4tTHVjIFBpY2FyZCIsInJhbmsiOiJDYXB0YWluIn0.27rXhOSa3cyB9NbFmQGyBAj5B2Ng7321FqKjLMmAm3w"
+          - match:
+              path: "/authenticate"
+              headers:
+              - name: "authorization"
+                exact_match: "Bearer invalid-response"
+            direct_response:
+              status: 200
+              body:
+                inline_string: "this-is-not-a-jwt"
+          - match:
+              path: "/authenticate"
+            direct_response:
+              status: 401
+        - name: staticreply
+          domains: ["*"]
+          routes:
+          - match:
+              prefix: "/api"
+            direct_response:
+              {{- if .Vars.DirectResponseCode }}
+              status: {{ .Vars.DirectResponseCode }}
+              {{- else }}
+              status: 200
+              {{- end }}
+              body:
+                inline_string: "hello, world!"
+      http_filters:
+      - name: envoy.filters.http.router
