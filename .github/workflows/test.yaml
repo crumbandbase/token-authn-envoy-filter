@@ -18,3 +18,5 @@ jobs:
       with:
         toolchain: ${{ matrix.rust }}
     - run: cargo test
+      env:
+        RUSTFLAGS: "-Clink-arg=-Wl,--allow-multiple-definition"
