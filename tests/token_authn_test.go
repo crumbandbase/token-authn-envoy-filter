@@ -24,6 +24,8 @@ func TestAuthn(t *testing.T) {
 		authority       string
 		omitUpstream    bool
 		wantErr         bool
+		authnSuccess    int
+		authnFailure    int
 		requestHeaders  map[string]string
 		responseHeaders map[string]string
 		responseCode    int
@@ -33,6 +35,7 @@ func TestAuthn(t *testing.T) {
 			method:          "GET",
 			path:            "/api",
 			authority:       "authn.example.com",
+			authnSuccess:    1,
 			requestHeaders:  map[string]string{"Authorization": "Bearer correct-credentials"},
 			responseHeaders: map[string]string{},
 			responseCode:    200,
@@ -42,6 +45,7 @@ func TestAuthn(t *testing.T) {
 			method:          "GET",
 			path:            "/bad",
 			authority:       "authn.example.com",
+			authnSuccess:    1,
 			requestHeaders:  map[string]string{"Authorization": "Bearer correct-credentials"},
 			responseHeaders: map[string]string{},
 			responseCode:    404,
@@ -51,6 +55,7 @@ func TestAuthn(t *testing.T) {
 			method:          "GET",
 			path:            "/api",
 			authority:       "authn.example.com",
+			authnFailure:    1,
 			requestHeaders:  map[string]string{"Authorization": "Bearer incorrect-credentials"},
 			responseHeaders: map[string]string{},
 			responseCode:    401,
@@ -59,6 +64,7 @@ func TestAuthn(t *testing.T) {
 			name:            "MissingCredentials",
 			method:          "GET",
 			path:            "/api",
+			authnFailure:    1,
 			responseHeaders: map[string]string{},
 			responseCode:    200,
 		},
@@ -80,6 +86,8 @@ func TestAuthn(t *testing.T) {
 				"ServerMetadata":        driver.LoadTestData("tests/testdata/server_node_metadata.yaml.tmpl"),
 				"Authority":             tt.authority,
 				"AuthnWasmFile":         filepath.Join(env.GetBazelBinOrDie(), "token_authn.wasm"),
+				"AuthnSuccess":          strconv.Itoa(tt.authnSuccess),
+				"AuthnFailure":          strconv.Itoa(tt.authnFailure),
 			}, ExtensionE2ETests)
 
 			params.Vars["ServerHTTPFilters"] = params.LoadTestData("tests/testdata/server_filter.yaml.tmpl")
@@ -107,6 +115,17 @@ func TestAuthn(t *testing.T) {
 						RequestHeaders:  tt.requestHeaders,
 						ResponseCode:    tt.responseCode,
 						ResponseHeaders: tt.responseHeaders,
+					},
+					&driver.Stats{
+						AdminPort: params.Ports.ServerAdmin,
+						Matchers: map[string]driver.StatMatcher{
+							"envoy_token_authn_filter_authentication_success_count": &driver.ExactStat{
+								Metric: "tests/testdata/stats/authn_success.yaml.tmpl",
+							},
+							"envoy_token_authn_filter_authentication_failure_count": &driver.ExactStat{
+								Metric: "tests/testdata/stats/authn_failure.yaml.tmpl",
+							},
+						},
 					},
 				},
 			}

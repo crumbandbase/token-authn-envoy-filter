@@ -5,8 +5,9 @@ use std::time::Duration;
 
 use log::{error, trace};
 
+use proxy_wasm::hostcalls;
 use proxy_wasm::traits::{Context, HttpContext, RootContext};
-use proxy_wasm::types::{Action, ContextType, LogLevel, Status};
+use proxy_wasm::types::{Action, ContextType, LogLevel, MetricType, Status};
 
 use serde::Deserialize;
 
@@ -49,12 +50,23 @@ pub fn _start() {
     proxy_wasm::set_root_context(|_| -> Box<dyn RootContext> {
         Box::new(TokenAuthnRoot {
             configuration: Configuration::default(),
+            success_metric: hostcalls::define_metric(
+                MetricType::Counter,
+                "token_authn_filter_authentication_success_count",
+            ).unwrap(),
+            failure_metric: hostcalls::define_metric(
+                MetricType::Counter,
+                "token_authn_filter_authentication_failure_count",
+            ).unwrap(),
         })
     });
 }
 
 struct TokenAuthnRoot {
     configuration: Configuration,
+    success_metric: u32,
+    failure_metric: u32,
+
 }
 
 impl Context for TokenAuthnRoot {}
@@ -77,6 +89,8 @@ impl RootContext for TokenAuthnRoot {
         Some(Box::new(TokenAuthn {
             context_id,
             configuration: self.configuration.clone(),
+            success_metric: self.success_metric,
+            failure_metric: self.failure_metric,
         }))
     }
 
@@ -88,15 +102,21 @@ impl RootContext for TokenAuthnRoot {
 struct TokenAuthn {
     context_id: u32,
     configuration: Configuration,
+    success_metric: u32,
+    failure_metric: u32,
 }
 
 impl Context for TokenAuthn {
     fn on_http_call_response(&mut self, _: u32, _: usize, body_size: usize, _: usize) {
         if let Some(body) = self.get_http_call_response_body(0, body_size) {
+            increment_metric(self.success_metric);
+
             self.set_http_request_header("authorization", Some(str::from_utf8(&body).unwrap()));
             self.resume_http_request();
             return;
         }
+
+        increment_metric(self.failure_metric);
 
         trace!("#{} unauthorized.", self.context_id);
         self.send_http_response(401, vec![], None);
@@ -114,6 +134,8 @@ impl HttpContext for TokenAuthn {
                 }
             };
         }
+
+        increment_metric(self.failure_metric);
 
         trace!("#{} header missing. ignoring.", self.context_id);
         Action::Continue
@@ -138,6 +160,10 @@ impl TokenAuthn {
             Duration::from_secs(timeout),
         )
     }
+}
+
+fn increment_metric(metric_id: u32) {
+    hostcalls::increment_metric(metric_id, 1).unwrap();
 }
 
 #[cfg(test)]
